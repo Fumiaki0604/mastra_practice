@@ -1,7 +1,4 @@
 import { createWorkflow, createStep } from "@mastra/core/workflows";
-import { confluenceSearchPagesTool, confluenceGetPageTool } from "../tools/confluenceTool";
-import { notionSearchPagesTool, notionGetPageTool } from "../tools/notionTool";
-import { backlogSearchWikiTool, backlogGetWikiTool } from "../tools/backlogTool";
 import { githubCreateIssueTool } from "../tools/githubTool";
 import { assistantAgent } from "../agents/assistantAgent";
 import { z } from "zod";
@@ -27,7 +24,7 @@ export const multiSourceWorkflow = createWorkflow({
         query: z.string(),
         owner: z.string(),
         repo: z.string(),
-        sources: z.array(z.string()).optional(),
+        sources: z.array(z.enum(["confluence", "notion", "backlog"])).optional(),
       }),
       outputSchema: z.object({
         results: z.array(
@@ -41,76 +38,50 @@ export const multiSourceWorkflow = createWorkflow({
         error: z.string().optional(),
       }),
       execute: async ({ inputData }) => {
-        const sources = inputData.sources || ["confluence", "notion", "backlog"];
+        const sources = inputData.sources || ["confluence"];
         const allResults: Array<{ source: string; pageId: string; title: string; url: string }> = [];
 
-        // Confluence検索
+        // Confluence検索のみ実装（Notion/Backlogは設定後に有効化）
         if (sources.includes("confluence")) {
           try {
+            const CONFLUENCE_BASE_URL = process.env.CONFLUENCE_BASE_URL || "";
+            const CONFLUENCE_API_TOKEN = process.env.CONFLUENCE_API_TOKEN || "";
+            const CONFLUENCE_USER_EMAIL = process.env.CONFLUENCE_USER_EMAIL || "";
+
+            if (!CONFLUENCE_BASE_URL || !CONFLUENCE_API_TOKEN) {
+              throw new Error("Confluence API設定が不足しています");
+            }
+
             const cqlPrompt = `以下の検索クエリをConfluence CQLに変換してください。シンプルに text ~ "キーワード" の形式で返してください。\nクエリ: ${inputData.query}\nCQL:`;
             const cqlResult = await assistantAgent.generateVNext(cqlPrompt);
             const cql = cqlResult.text.trim();
 
-            const confluenceResult = await confluenceSearchPagesTool.execute({
-              context: { cql },
+            const auth = Buffer.from(`${CONFLUENCE_USER_EMAIL}:${CONFLUENCE_API_TOKEN}`).toString("base64");
+            const params = new URLSearchParams();
+            params.append("cql", cql);
+
+            const response = await fetch(`${CONFLUENCE_BASE_URL}/wiki/rest/api/search?${params.toString()}`, {
+              headers: {
+                Authorization: `Basic ${auth}`,
+                Accept: "application/json",
+              },
             });
 
-            if (confluenceResult.pages && confluenceResult.pages.length > 0) {
-              confluenceResult.pages.forEach((page) => {
-                allResults.push({
-                  source: "confluence",
-                  pageId: page.id,
-                  title: page.title,
-                  url: page.url || "",
-                });
+            if (response.ok) {
+              const data = await response.json();
+              data.results?.forEach((result: any) => {
+                if (result.content) {
+                  allResults.push({
+                    source: "confluence",
+                    pageId: result.content.id,
+                    title: result.content.title,
+                    url: `${CONFLUENCE_BASE_URL}/wiki${result.url}`,
+                  });
+                }
               });
             }
           } catch (error) {
             console.error("Confluence search error:", error);
-          }
-        }
-
-        // Notion検索
-        if (sources.includes("notion")) {
-          try {
-            const notionResult = await notionSearchPagesTool.execute({
-              context: { query: inputData.query },
-            });
-
-            if (notionResult.pages && notionResult.pages.length > 0) {
-              notionResult.pages.forEach((page) => {
-                allResults.push({
-                  source: "notion",
-                  pageId: page.id,
-                  title: page.title,
-                  url: page.url,
-                });
-              });
-            }
-          } catch (error) {
-            console.error("Notion search error:", error);
-          }
-        }
-
-        // Backlog検索
-        if (sources.includes("backlog")) {
-          try {
-            const backlogResult = await backlogSearchWikiTool.execute({
-              context: { query: inputData.query },
-            });
-
-            if (backlogResult.pages && backlogResult.pages.length > 0) {
-              backlogResult.pages.forEach((page) => {
-                allResults.push({
-                  source: "backlog",
-                  pageId: page.id,
-                  title: page.title,
-                  url: page.url,
-                });
-              });
-            }
-          } catch (error) {
-            console.error("Backlog search error:", error);
           }
         }
 
@@ -155,31 +126,47 @@ export const multiSourceWorkflow = createWorkflow({
         }
 
         const firstResult = inputData.results[0];
-        let pageContent;
 
         try {
           if (firstResult.source === "confluence") {
-            pageContent = await confluenceGetPageTool.execute({
-              context: { pageId: firstResult.pageId, expand: "body.storage" },
+            const CONFLUENCE_BASE_URL = process.env.CONFLUENCE_BASE_URL || "";
+            const CONFLUENCE_API_TOKEN = process.env.CONFLUENCE_API_TOKEN || "";
+            const CONFLUENCE_USER_EMAIL = process.env.CONFLUENCE_USER_EMAIL || "";
+
+            const auth = Buffer.from(`${CONFLUENCE_USER_EMAIL}:${CONFLUENCE_API_TOKEN}`).toString("base64");
+            const params = new URLSearchParams();
+            params.append("expand", "body.storage");
+
+            const response = await fetch(`${CONFLUENCE_BASE_URL}/wiki/rest/api/content/${firstResult.pageId}?${params.toString()}`, {
+              headers: {
+                Authorization: `Basic ${auth}`,
+                Accept: "application/json",
+              },
             });
-          } else if (firstResult.source === "notion") {
-            pageContent = await notionGetPageTool.execute({
-              context: { pageId: firstResult.pageId },
-            });
-          } else if (firstResult.source === "backlog") {
-            pageContent = await backlogGetWikiTool.execute({
-              context: { pageId: firstResult.pageId },
-            });
+
+            if (response.ok) {
+              const page = await response.json();
+              return {
+                page: {
+                  source: firstResult.source,
+                  id: page.id,
+                  title: page.title,
+                  url: `${CONFLUENCE_BASE_URL}/wiki${page._links?.webui}`,
+                  content: page.body?.storage?.value,
+                },
+              };
+            }
           }
 
           return {
             page: {
               source: firstResult.source,
-              id: pageContent?.page?.id || firstResult.pageId,
-              title: pageContent?.page?.title || firstResult.title,
-              url: pageContent?.page?.url || firstResult.url,
-              content: pageContent?.page?.content,
+              id: firstResult.pageId,
+              title: firstResult.title,
+              url: firstResult.url,
+              content: undefined,
             },
+            error: "ページ内容の取得に失敗しました",
           };
         } catch (error) {
           return {

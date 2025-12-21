@@ -2,6 +2,9 @@
   "name": "mastra_practice",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "xstate": "^4.38.3"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
