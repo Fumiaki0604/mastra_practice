@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     // リクエストボディを取得
     const body = await request.json();
-    const { query, owner, repo } = body;
+    const { query, owner, repo, sources } = body;
 
 
     // バリデーションを実施（パラメーターが不足していたらエラーを返す）
@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
     // Mastraワークフローインスタンスを取得
     const { mastra } = await import("@/src/mastra");
-    const workflow = mastra.getWorkflow("handsonWorkflow");
+    // 複数ソース対応の新ワークフローを使用
+    const workflow = mastra.getWorkflow("multiSourceWorkflow");
 
     if (!workflow) {
       throw new Error("ワークフローが見つかりません");
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     // ワークフローを実行
     const run = await workflow.createRunAsync();
     const result = await run.start({
-      inputData: { query, owner, repo }
+      inputData: { query, owner, repo, sources }
     });
 
     // 返却メッセージとステータスを作成
