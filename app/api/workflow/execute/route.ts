@@ -33,11 +33,13 @@ export async function POST(request: NextRequest) {
     // 返却メッセージとステータスを作成
     let message;
     let isSuccess;
-    if (result.status === "success" && result.result.success) {
+    if (result.status === "success" && result.result?.success) {
       message = "ワークフローが正常に完了しました";
       isSuccess = true;
     } else {
-      message = `${(result as any).error} ${(result as any).result.errors}`;
+      const errorMsg = (result as any).error || "不明なエラー";
+      const resultErrors = (result as any).result?.errors || "";
+      message = `${errorMsg} ${resultErrors}`.trim();
       isSuccess = false;
     }
 // Mastraワークフローの結果から必要な情報を抽出
