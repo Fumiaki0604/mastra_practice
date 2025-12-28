@@ -48,6 +48,13 @@ export const multiSourceWorkflow = createWorkflow({
             const CONFLUENCE_API_TOKEN = process.env.CONFLUENCE_API_TOKEN || "";
             const CONFLUENCE_USER_EMAIL = process.env.CONFLUENCE_USER_EMAIL || "";
 
+            console.log("Confluence環境変数確認:", {
+              hasBaseUrl: !!CONFLUENCE_BASE_URL,
+              hasToken: !!CONFLUENCE_API_TOKEN,
+              hasEmail: !!CONFLUENCE_USER_EMAIL,
+              baseUrl: CONFLUENCE_BASE_URL,
+            });
+
             if (!CONFLUENCE_BASE_URL || !CONFLUENCE_API_TOKEN) {
               throw new Error("Confluence API設定が不足しています");
             }
@@ -56,19 +63,28 @@ export const multiSourceWorkflow = createWorkflow({
             const cqlResult = await assistantAgent.generateVNext(cqlPrompt);
             const cql = cqlResult.text.trim();
 
+            console.log("生成されたCQL:", cql);
+
             const auth = Buffer.from(`${CONFLUENCE_USER_EMAIL}:${CONFLUENCE_API_TOKEN}`).toString("base64");
             const params = new URLSearchParams();
             params.append("cql", cql);
 
-            const response = await fetch(`${CONFLUENCE_BASE_URL}/wiki/rest/api/search?${params.toString()}`, {
+            const searchUrl = `${CONFLUENCE_BASE_URL}/wiki/rest/api/search?${params.toString()}`;
+            console.log("Confluence検索URL:", searchUrl);
+
+            const response = await fetch(searchUrl, {
               headers: {
                 Authorization: `Basic ${auth}`,
                 Accept: "application/json",
               },
             });
 
+            console.log("Confluence APIレスポンスステータス:", response.status);
+
             if (response.ok) {
               const data = await response.json();
+              console.log("検索結果件数:", data.results?.length || 0);
+
               data.results?.forEach((result: any) => {
                 if (result.content) {
                   allResults.push({
@@ -79,16 +95,21 @@ export const multiSourceWorkflow = createWorkflow({
                   });
                 }
               });
+            } else {
+              const errorText = await response.text();
+              console.error("Confluence API エラー:", response.status, errorText);
             }
           } catch (error) {
             console.error("Confluence search error:", error);
           }
         }
 
+        console.log("全検索結果件数:", allResults.length);
+
         if (allResults.length === 0) {
           return {
             results: [],
-            error: "検索結果が見つかりませんでした。",
+            error: "検索結果が見つかりませんでした。Confluenceに該当するページがあるか確認してください。",
           };
         }
 
