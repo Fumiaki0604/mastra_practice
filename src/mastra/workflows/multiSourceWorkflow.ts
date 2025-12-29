@@ -142,8 +142,18 @@ export const multiSourceWorkflow = createWorkflow({
         error: z.string().optional(),
       }),
       execute: async ({ inputData }) => {
+        // 検索結果が0件の場合は、エラーを投げずに適切なメッセージを返す
         if (inputData.error || !inputData.results || inputData.results.length === 0) {
-          throw new Error(inputData.error || "検索結果が見つかりませんでした");
+          return {
+            page: {
+              source: "none",
+              id: "",
+              title: "検索結果なし",
+              url: "",
+              content: undefined,
+            },
+            error: inputData.error || "検索結果が見つかりませんでした。Confluenceに該当するページを作成するか、検索クエリを変更してください。",
+          };
         }
 
         const firstResult = inputData.results[0];
@@ -222,14 +232,29 @@ export const multiSourceWorkflow = createWorkflow({
         const { page, error } = inputData;
         const { owner, repo, query } = getInitData();
 
+        // 検索結果が見つからなかった場合は、その旨をIssueとして作成
         if (error || !page || !page.content) {
           return {
             owner: owner || "",
             repo: repo || "",
             issues: [
               {
-                title: "エラー: ページの内容が取得できませんでした",
-                body: `ソース: ${page?.source || "不明"}\nエラー: ${error || "コンテンツなし"}`,
+                title: `調査依頼: ${query}`,
+                body: `## 検索結果
+
+検索クエリ「${query}」に該当する情報がConfluenceで見つかりませんでした。
+
+### 次のアクション
+- [ ] Confluenceに該当する要件書やドキュメントが存在するか確認
+- [ ] 検索キーワードを変更して再検索
+- [ ] 必要に応じて新しいドキュメントをConfluenceに作成
+
+### エラー詳細
+${error || "コンテンツが取得できませんでした"}
+
+---
+**検索ソース:** Confluence
+**検索クエリ:** ${query}`,
               },
             ],
           };
