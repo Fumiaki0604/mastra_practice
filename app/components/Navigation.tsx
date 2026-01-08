@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthenticator } from "@aws-amplify/ui-react";
+import Link from "next/link";
 
 export const Navigation = () => {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
@@ -12,6 +13,21 @@ export const Navigation = () => {
           <div className="flex items-center space-x-8">
             <div className="flex-shrink-0">
               <h1 className="text-xl font-bold">AI Assistant</h1>
+            </div>
+            {/* ナビゲーションリンク */}
+            <div className="flex space-x-4">
+              <Link
+                href="/"
+                className="text-sm text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                要件書→バックログ
+              </Link>
+              <Link
+                href="/backlog-notify"
+                className="text-sm text-gray-700 hover:text-orange-600 transition-colors"
+              >
+                Backlog課題通知
+              </Link>
             </div>
           </div>
           {/* ユーザー情報とサインアウトボタンを表示する部分（右側） */}
