@@ -49,11 +49,16 @@ export async function POST(request: NextRequest) {
         : [],
     });
   } catch (error) {
+    // エラーをコンソールに出力
+    console.error("❌ エラー発生:", error);
+    console.error("スタックトレース:", error instanceof Error ? error.stack : "なし");
+
     // エラーをAPIレスポンスとして返却
     return NextResponse.json(
       {
         error: "ワークフローの実行中にエラーが発生しました",
         details: error instanceof Error ? error.message : "エラー",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

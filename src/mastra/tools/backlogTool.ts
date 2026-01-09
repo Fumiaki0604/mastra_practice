@@ -1,15 +1,48 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-const BACKLOG_SPACE_ID = process.env.BACKLOG_SPACE_ID || "";
-const BACKLOG_API_KEY = process.env.BACKLOG_API_KEY || "";
-
-function getBacklogBaseUrl(): string {
-  return `https://${BACKLOG_SPACE_ID}.backlog.jp/api/v2`;
+// 複数のBacklogスペースを定義
+interface BacklogSpace {
+  spaceId: string;
+  apiKey: string;
 }
 
-async function callBacklogAPI(endpoint: string): Promise<any> {
-  const url = `${getBacklogBaseUrl()}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${BACKLOG_API_KEY}`;
+function getBacklogSpaces(): BacklogSpace[] {
+  const spaces: BacklogSpace[] = [];
+
+  // 環境変数から複数のスペース設定を読み込む
+  // BACKLOG_SPACE_ID, BACKLOG_API_KEY（デフォルト）
+  // BACKLOG_SPACE_ID_1, BACKLOG_API_KEY_1（追加1）
+  // BACKLOG_SPACE_ID_2, BACKLOG_API_KEY_2（追加2）
+  // ...
+
+  const defaultSpaceId = process.env.BACKLOG_SPACE_ID;
+  const defaultApiKey = process.env.BACKLOG_API_KEY;
+
+  if (defaultSpaceId && defaultApiKey) {
+    spaces.push({ spaceId: defaultSpaceId, apiKey: defaultApiKey });
+  }
+
+  // 追加のスペース設定を読み込む（最大10個まで）
+  for (let i = 1; i <= 10; i++) {
+    const spaceId = process.env[`BACKLOG_SPACE_ID_${i}`];
+    const apiKey = process.env[`BACKLOG_API_KEY_${i}`];
+
+    if (spaceId && apiKey) {
+      spaces.push({ spaceId, apiKey });
+    }
+  }
+
+  return spaces;
+}
+
+function getBacklogBaseUrl(spaceId: string): string {
+  return `https://${spaceId}.backlog.jp/api/v2`;
+}
+
+async function callBacklogAPI(spaceId: string, apiKey: string, endpoint: string): Promise<any> {
+  const baseUrl = getBacklogBaseUrl(spaceId);
+  const url = `${baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${apiKey}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -55,42 +88,55 @@ export const backlogSearchUrgentIssuesTool = createTool({
   }),
   execute: async ({ context }) => {
     try {
-      if (!BACKLOG_SPACE_ID || !BACKLOG_API_KEY) {
+      const spaces = getBacklogSpaces();
+
+      if (spaces.length === 0) {
         return { issues: [], total: 0, error: "Backlog API設定が不足しています" };
-      }
-
-      // 全プロジェクトを取得
-      const projects = await callBacklogAPI("/projects");
-
-      if (!projects || projects.length === 0) {
-        return { issues: [], total: 0, error: "プロジェクトが見つかりません" };
       }
 
       const allIssues: any[] = [];
 
-      // 各プロジェクトから課題を取得
-      for (const project of projects) {
+      // 各スペースから課題を取得
+      for (const space of spaces) {
         try {
-          // 未完了の課題のみ取得（statusId[]=1,2,3など、完了以外）
-          const issues = await callBacklogAPI(
-            `/issues?projectId[]=${project.id}&statusId[]=1&statusId[]=2&statusId[]=3&count=100`
-          );
+          // 全プロジェクトを取得
+          const projects = await callBacklogAPI(space.spaceId, space.apiKey, "/projects");
 
-          issues.forEach((issue: any) => {
-            if (issue.dueDate) {
-              const daysUntil = getDaysUntilDue(issue.dueDate);
-              // 指定された日数以内の課題のみ
-              if (daysUntil <= context.daysThreshold && daysUntil >= 0) {
-                allIssues.push({
-                  ...issue,
-                  projectName: project.name,
-                  daysUntilDue: daysUntil,
-                });
-              }
+          if (!projects || projects.length === 0) {
+            console.warn(`スペース ${space.spaceId}: プロジェクトが見つかりません`);
+            continue;
+          }
+
+          // 各プロジェクトから課題を取得
+          for (const project of projects) {
+            try {
+              // 未完了の課題のみ取得（statusId[]=1,2,3など、完了以外）
+              const issues = await callBacklogAPI(
+                space.spaceId,
+                space.apiKey,
+                `/issues?projectId[]=${project.id}&statusId[]=1&statusId[]=2&statusId[]=3&count=100`
+              );
+
+              issues.forEach((issue: any) => {
+                if (issue.dueDate) {
+                  const daysUntil = getDaysUntilDue(issue.dueDate);
+                  // 指定された日数以内の課題のみ
+                  if (daysUntil <= context.daysThreshold && daysUntil >= 0) {
+                    allIssues.push({
+                      ...issue,
+                      projectName: project.name,
+                      daysUntilDue: daysUntil,
+                      spaceId: space.spaceId, // スペースIDを追加
+                    });
+                  }
+                }
+              });
+            } catch (err) {
+              console.error(`Error fetching issues for project ${project.name}:`, err);
             }
-          });
+          }
         } catch (err) {
-          console.error(`Error fetching issues for project ${project.name}:`, err);
+          console.error(`Error fetching projects for space ${space.spaceId}:`, err);
         }
       }
 
@@ -107,7 +153,7 @@ export const backlogSearchUrgentIssuesTool = createTool({
         status: issue.status?.name || "不明",
         assignee: issue.assignee?.name || "未割り当て",
         projectName: issue.projectName,
-        url: `https://${BACKLOG_SPACE_ID}.backlog.jp/view/${issue.issueKey}`,
+        url: `https://${issue.spaceId}.backlog.jp/view/${issue.issueKey}`,
       }));
 
       return { issues: formattedIssues, total: formattedIssues.length };
