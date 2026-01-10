@@ -21,7 +21,23 @@ export const backlogToSlackWorkflow = createWorkflow({
   outputSchema: slackNotifyUrgentIssuesTool.outputSchema,
 })
   // Step 1: Backlogから納期の迫った課題を取得
-  .then(createStep(backlogSearchUrgentIssuesTool))
+  .then(
+    createStep({
+      id: "fetch-backlog-issues",
+      inputSchema: z.object({
+        daysThreshold: z.number().optional().default(3),
+        channelId: z.string().optional(),
+      }),
+      outputSchema: backlogSearchUrgentIssuesTool.outputSchema,
+      execute: async ({ inputData, runtimeContext, tracingContext }) => {
+        return await backlogSearchUrgentIssuesTool.execute({
+          context: { daysThreshold: inputData.daysThreshold },
+          runtimeContext,
+          tracingContext,
+        });
+      },
+    })
+  )
   // Step 2: 取得した課題をSlackに通知
   .then(
     createStep({
