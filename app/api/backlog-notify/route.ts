@@ -32,10 +32,14 @@ export async function POST(request: NextRequest) {
       message = "Slackへの通知が完了しました";
       isSuccess = result.result?.success || false;
       messageUrl = result.result?.messageUrl;
-    } else {
-      // status === "failed"
+    } else if (result.status === "failed") {
       const errorMsg = result.error?.message || "不明なエラー";
       message = errorMsg;
+      isSuccess = false;
+      messageUrl = undefined;
+    } else {
+      // status === "suspended"
+      message = "ワークフローが一時停止しました";
       isSuccess = false;
       messageUrl = undefined;
     }
