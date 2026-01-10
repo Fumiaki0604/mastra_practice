@@ -92,7 +92,7 @@ const BacklogNotifyPage = () => {
                   onChange={(e) => setDaysThreshold(Number(e.target.value))}
                   min="-365"
                   max="0"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500 text-gray-900"
                   required
                 />
                 <p className="text-sm text-gray-500 mt-1">
@@ -113,7 +113,7 @@ const BacklogNotifyPage = () => {
                   value={channelId}
                   onChange={(e) => setChannelId(e.target.value)}
                   placeholder="例: C01234567ABC（省略時は環境変数から取得）"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500 text-gray-900 placeholder:text-gray-400"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   空欄の場合は環境変数 SLACK_CHANNEL_ID が使用されます
