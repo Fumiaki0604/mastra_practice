@@ -24,23 +24,27 @@ export async function POST(request: NextRequest) {
     });
 
     // 返却メッセージとステータスを作成
-    let message;
-    let isSuccess;
+    let message: string;
+    let isSuccess: boolean;
+    let messageUrl: string | undefined;
 
-    if (result.status === "success" && result.result?.success) {
+    if (result.status === "success") {
       message = "Slackへの通知が完了しました";
-      isSuccess = true;
+      isSuccess = result.result?.success || false;
+      messageUrl = result.result?.messageUrl;
     } else {
-      const errorMsg = (result as any).error || result.result?.error || "不明なエラー";
+      // status === "failed"
+      const errorMsg = result.error?.message || "不明なエラー";
       message = errorMsg;
       isSuccess = false;
+      messageUrl = undefined;
     }
 
     // 結果をAPIレスポンスとして返却
     return NextResponse.json({
       success: isSuccess,
       message: message,
-      messageUrl: result.result?.messageUrl,
+      messageUrl: messageUrl,
       steps: result.steps
         ? Object.keys(result.steps).map((stepId) => ({
             stepId,
