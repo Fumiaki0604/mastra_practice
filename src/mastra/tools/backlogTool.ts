@@ -65,7 +65,7 @@ export const backlogSearchUrgentIssuesTool = createTool({
   id: "backlog-search-urgent-issues",
   description: "Backlogで納期の迫っている課題をプロジェクト横断で検索します",
   inputSchema: z.object({
-    daysThreshold: z.number().optional().default(14).describe("期限までの日数の閾値（デフォルト14日）"),
+    daysThreshold: z.number().optional().default(-1).describe("期限までの日数の閾値（デフォルト-1: 納期が1日以上過ぎた課題）"),
     statusIds: z.array(z.number()).optional().describe("検索対象のステータスID（省略時は未完了のみ）"),
   }),
   outputSchema: z.object({
@@ -120,8 +120,9 @@ export const backlogSearchUrgentIssuesTool = createTool({
               issues.forEach((issue: any) => {
                 if (issue.dueDate) {
                   const daysUntil = getDaysUntilDue(issue.dueDate);
-                  // 指定された日数以内の課題のみ
-                  if (daysUntil <= context.daysThreshold && daysUntil >= 0) {
+                  // 納期が過ぎている課題のみ（daysUntilが負の値）
+                  // thresholdが-1の場合、1日以上遅延している課題を取得
+                  if (daysUntil <= context.daysThreshold) {
                     allIssues.push({
                       ...issue,
                       projectName: project.name,

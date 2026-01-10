@@ -9,11 +9,13 @@ interface NotifyResult {
   steps?: Array<{ stepId: string; status: string }>;
   error?: string;
   details?: string;
+  skipped?: boolean;
 }
 
 const BacklogNotifyPage = () => {
-  const [daysThreshold, setDaysThreshold] = useState<number>(3);
+  const [daysThreshold, setDaysThreshold] = useState<number>(-1);
   const [channelId, setChannelId] = useState<string>("");
+  const [skipWeekendHoliday, setSkipWeekendHoliday] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NotifyResult | null>(null);
 
@@ -31,6 +33,7 @@ const BacklogNotifyPage = () => {
         body: JSON.stringify({
           daysThreshold,
           channelId: channelId || undefined,
+          skipWeekendHoliday,
         }),
       });
 
@@ -60,15 +63,15 @@ const BacklogNotifyPage = () => {
               Backlog課題 Slack通知
             </h1>
             <p className="text-gray-600 mb-8">
-              納期の迫ったBacklog課題をSlackに自動通知します
+              納期が過ぎたBacklog課題をSlackに自動通知します
             </p>
 
             {/* 説明セクション */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
               <h2 className="font-semibold text-blue-900 mb-2">📋 機能説明</h2>
               <ul className="text-sm text-blue-800 space-y-1">
-                <li>• 全プロジェクトから納期の迫った課題を取得</li>
-                <li>• 期限が近い順に並び替えて通知</li>
+                <li>• 全プロジェクトから納期が過ぎた課題を取得</li>
+                <li>• 遅延日数が多い順に並び替えて通知</li>
                 <li>• 担当者、プロジェクト名、ステータスを表示</li>
               </ul>
             </div>
@@ -80,20 +83,20 @@ const BacklogNotifyPage = () => {
                   htmlFor="daysThreshold"
                   className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  📅 納期の閾値（日数）
+                  📅 遅延日数の閾値
                 </label>
                 <input
                   type="number"
                   id="daysThreshold"
                   value={daysThreshold}
                   onChange={(e) => setDaysThreshold(Number(e.target.value))}
-                  min="1"
-                  max="30"
+                  min="-365"
+                  max="0"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500"
                   required
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  指定した日数以内に期限が来る課題を通知します（デフォルト: 3日）
+                  納期から何日以上遅延している課題を通知するか（デフォルト: -1 = 1日以上遅延）
                 </p>
               </div>
 
@@ -114,6 +117,24 @@ const BacklogNotifyPage = () => {
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   空欄の場合は環境変数 SLACK_CHANNEL_ID が使用されます
+                </p>
+              </div>
+
+              {/* 平日のみ配信オプション */}
+              <div className="group">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipWeekendHoliday}
+                    onChange={(e) => setSkipWeekendHoliday(e.target.checked)}
+                    className="w-5 h-5 border-2 border-gray-300 rounded focus:ring-4 focus:ring-orange-100 text-orange-600"
+                  />
+                  <span className="text-sm font-semibold text-gray-700">
+                    📅 平日のみ配信（土日祝日はスキップ）
+                  </span>
+                </label>
+                <p className="text-sm text-gray-500 mt-2 ml-8">
+                  チェックを入れると、土日祝日の場合は通知を送信しません
                 </p>
               </div>
 
