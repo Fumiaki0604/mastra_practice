@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // 日本の祝日を判定する関数（簡易版）
+// 注意: JSTに変換済みのDateを渡すこと（getJSTDate()の戻り値）
 function isJapaneseHoliday(date: Date): boolean {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
+  const month = date.getUTCMonth() + 1; // UTCの月を取得（JSTに変換済みなのでUTCを使用）
+  const day = date.getUTCDate(); // UTCの日を取得
 
   // 固定祝日のリスト（2024-2026年の主要な祝日）
   const holidays = [
@@ -25,14 +25,22 @@ function isJapaneseHoliday(date: Date): boolean {
   return holidays.some((h) => h.month === month && h.day === day);
 }
 
-// 平日（土日祝日を除く）かどうかを判定
+// 日本時間（JST）の日付を取得
+function getJSTDate(): Date {
+  const now = new Date();
+  // UTCからJST（+9時間）に変換
+  const jstOffset = 9 * 60 * 60 * 1000;
+  return new Date(now.getTime() + jstOffset);
+}
+
+// 平日（土日祝日を除く）かどうかを判定（日本時間ベース）
 function isWeekday(date: Date): boolean {
-  const dayOfWeek = date.getDay();
+  const dayOfWeek = date.getUTCDay(); // UTCの曜日を取得（JSTに変換済みなのでUTCDayを使用）
   // 0 = 日曜日, 6 = 土曜日
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     return false;
   }
-  // 祝日チェック
+  // 祝日チェック（JSTベースの月日で判定）
   if (isJapaneseHoliday(date)) {
     return false;
   }
@@ -45,10 +53,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { daysThreshold, channelId, skipWeekendHoliday = true } = body;
 
-    // 平日のみ配信する設定の場合、土日祝日はスキップ
+    // 平日のみ配信する設定の場合、土日祝日はスキップ（日本時間ベース）
     if (skipWeekendHoliday) {
-      const now = new Date();
-      if (!isWeekday(now)) {
+      const jstNow = getJSTDate();
+      if (!isWeekday(jstNow)) {
         return NextResponse.json({
           success: true,
           message: "土日祝日のため通知をスキップしました",

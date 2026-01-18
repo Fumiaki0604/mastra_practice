@@ -115,8 +115,15 @@ CONFLUENCE_USER_EMAIL=user@example.com
 NOTION_API_TOKEN=secret_xxxxx
 
 # Backlog (required for Backlog課題通知)
+# Default workspace
 BACKLOG_SPACE_ID=your-space
 BACKLOG_API_KEY=xxxxx
+
+# Additional workspaces (optional, up to 10 total)
+# BACKLOG_SPACE_ID_1=another-space
+# BACKLOG_API_KEY_1=yyyyy
+# BACKLOG_SPACE_ID_2=third-space
+# BACKLOG_API_KEY_2=zzzzz
 
 # Slack (required for Backlog課題通知)
 SLACK_BOT_TOKEN=xoxb-xxxxx
@@ -255,15 +262,138 @@ The workflow will search Confluence/Notion/Backlog, retrieve content, analyze it
 1. Start dev server: `npm run dev`
 2. Open http://localhost:3000/backlog-notify
 3. Fill in the form:
-   - **納期の閾値（日数）**: Number of days threshold (default: 3)
+   - **遅延日数の閾値**: Delay threshold in days (default: -1 = 1+ days overdue)
    - **SlackチャンネルID**: Optional Slack channel ID (uses env var if empty)
+   - **平日のみ配信**: Checkbox to skip weekends/holidays (default: checked)
 4. Click "Slackに通知" to execute
 
 The workflow will:
-- Retrieve all Backlog issues from all projects with due dates within the threshold
-- Sort them by urgency (closest due date first)
+- Retrieve all **overdue** Backlog issues from all projects across multiple workspaces
+- Sort them by delay (most overdue first)
+- Skip execution on weekends/holidays if enabled
 - Send a formatted notification to the specified Slack channel
-- Display issue key, summary, due date, assignee, project, and status
+- Display issue key, summary, due date, days overdue, assignee, project, and status
+
+## Production Deployment
+
+### Vercel
+
+This application is deployed to Vercel at: **https://mastra-practice.vercel.app/**
+
+#### Deployment Steps
+
+1. Connect GitHub repository to Vercel
+2. Configure environment variables in Vercel Dashboard (Project Settings → Environment Variables)
+3. Deploy automatically on git push to main branch
+
+#### Critical Security Note
+
+**Always use Next.js 15.3.8 or later.** Versions 15.3.4 and earlier have critical vulnerabilities:
+- CVE-2025-66478 (Critical - Remote Code Execution)
+- CVE-2025-55184 (High - DoS)
+- CVE-2025-55183 (Medium - Source code exposure)
+- CVE-2025-67779 (High - DoS)
+
+To update Next.js:
+```bash
+npx fix-react2shell-next --fix
+npm install
+```
+
+### GitHub Actions - Scheduled Notifications
+
+A GitHub Actions workflow ([.github/workflows/backlog-notify.yml](.github/workflows/backlog-notify.yml)) automatically runs the Backlog notification every weekday at **7:30 AM JST** (22:30 UTC previous day).
+
+**Workflow configuration:**
+```yaml
+on:
+  schedule:
+    - cron: '30 22 * * *'  # 7:30 AM JST daily
+  workflow_dispatch:  # Manual execution also available
+```
+
+The workflow calls the Vercel production API:
+```bash
+curl -X POST https://mastra-practice.vercel.app/api/backlog-notify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "daysThreshold": -1,
+    "skipWeekendHoliday": true
+  }'
+```
+
+**Monitoring execution:**
+1. Go to GitHub repository → Actions tab
+2. Select "Backlog課題 定期通知" workflow
+3. View execution history and logs
+
+On weekends/holidays, the API returns:
+```json
+{
+  "success": true,
+  "message": "土日祝日のため通知をスキップしました",
+  "skipped": true,
+  "steps": []
+}
+```
+
+## Backlog Notification System Details
+
+### Multi-Workspace Support
+
+The Backlog notification system can monitor up to **10 different Backlog workspaces** simultaneously. This is configured through environment variables following the pattern:
+- `BACKLOG_SPACE_ID`, `BACKLOG_API_KEY` (default workspace)
+- `BACKLOG_SPACE_ID_1`, `BACKLOG_API_KEY_1` (additional workspace 1)
+- `BACKLOG_SPACE_ID_2`, `BACKLOG_API_KEY_2` (additional workspace 2)
+- ... up to `BACKLOG_SPACE_ID_10`, `BACKLOG_API_KEY_10`
+
+See [src/mastra/tools/backlogTool.ts:10-37](src/mastra/tools/backlogTool.ts) for implementation.
+
+### Overdue Detection Logic
+
+The system calculates days until due date using `getDaysUntilDue()` ([backlogTool.ts:54-61](src/mastra/tools/backlogTool.ts)):
+
+```typescript
+function getDaysUntilDue(dueDate: string): number {
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffTime = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays; // Negative value = overdue
+}
+```
+
+- **Positive value**: Still before due date (e.g., 3 = 3 days remaining)
+- **Negative value**: Overdue (e.g., -5 = 5 days late)
+- **Default threshold -1**: Notifies issues that are 1+ days overdue
+
+### Weekday-Only Delivery
+
+The API route ([app/api/backlog-notify/route.ts:3-40](app/api/backlog-notify/route.ts)) includes Japanese holiday detection:
+
+**Fixed holidays checked:**
+- January 1 (元日)
+- February 11 (建国記念の日)
+- February 23 (天皇誕生日)
+- April 29 (昭和の日)
+- May 3, 4, 5 (GW: 憲法記念日, みどりの日, こどもの日)
+- August 11 (山の日)
+- November 3, 23 (文化の日, 勤労感謝の日)
+
+When `skipWeekendHoliday: true` (default), notifications are skipped on:
+- Saturdays (dayOfWeek === 6)
+- Sundays (dayOfWeek === 0)
+- Japanese national holidays (listed above)
+
+### Workflow Steps
+
+The `backlogToSlackWorkflow` ([src/mastra/workflows/backlogToSlackWorkflow.ts](src/mastra/workflows/backlogToSlackWorkflow.ts)) executes in 3 steps:
+
+1. **fetch-backlog-issues**: Calls `backlogSearchUrgentIssuesTool` to retrieve overdue issues from all configured workspaces
+2. **prepare-slack-notification**: Transforms the issue data and adds the `channelId` from initial input
+3. **Slack送信**: Calls `slackNotifyUrgentIssuesTool` to post formatted message to Slack
+
+Issues are sorted by `daysUntilDue` (most overdue first) before being sent to Slack.
 
 ## Debugging
 
@@ -271,3 +401,4 @@ The workflow will:
 - Check browser DevTools Network tab for API response details
 - Workflow results include a `steps` array showing status of each step
 - For Bedrock issues, verify AWS credentials via Amplify Auth console
+- For GitHub Actions issues, check the Actions tab logs in the repository
