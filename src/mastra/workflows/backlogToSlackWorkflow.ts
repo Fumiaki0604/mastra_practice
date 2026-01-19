@@ -8,11 +8,16 @@ export const backlogToSlackWorkflow = createWorkflow({
   id: "backlogToSlackWorkflow",
   description: "納期の迫ったBacklog課題を取得してSlackに通知します",
   inputSchema: z.object({
-    daysThreshold: z
+    daysThresholdMin: z
       .number()
       .optional()
-      .default(-1)
-      .describe("期限までの日数の閾値（デフォルト-1: 納期が1日以上過ぎた課題）"),
+      .default(-3)
+      .describe("期限までの日数の下限（デフォルト-3: 3日遅延まで）"),
+    daysThresholdMax: z
+      .number()
+      .optional()
+      .default(0)
+      .describe("期限までの日数の上限（デフォルト0: 期限当日まで）"),
     channelId: z
       .string()
       .optional()
@@ -25,13 +30,17 @@ export const backlogToSlackWorkflow = createWorkflow({
     createStep({
       id: "fetch-backlog-issues",
       inputSchema: z.object({
-        daysThreshold: z.number().optional().default(-1),
+        daysThresholdMin: z.number().optional().default(-3),
+        daysThresholdMax: z.number().optional().default(0),
         channelId: z.string().optional(),
       }),
       outputSchema: backlogSearchUrgentIssuesTool.outputSchema,
       execute: async ({ inputData, runtimeContext, tracingContext }) => {
         return await backlogSearchUrgentIssuesTool.execute({
-          context: { daysThreshold: inputData.daysThreshold },
+          context: {
+            daysThresholdMin: inputData.daysThresholdMin,
+            daysThresholdMax: inputData.daysThresholdMax,
+          },
           runtimeContext,
           tracingContext,
         });

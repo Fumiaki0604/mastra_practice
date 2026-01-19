@@ -13,7 +13,8 @@ interface NotifyResult {
 }
 
 const BacklogNotifyPage = () => {
-  const [daysThreshold, setDaysThreshold] = useState<number>(-1);
+  const [daysThresholdMin, setDaysThresholdMin] = useState<number>(-3);
+  const [daysThresholdMax, setDaysThresholdMax] = useState<number>(0);
   const [channelId, setChannelId] = useState<string>("");
   const [skipWeekendHoliday, setSkipWeekendHoliday] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +32,8 @@ const BacklogNotifyPage = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          daysThreshold,
+          daysThresholdMin,
+          daysThresholdMax,
           channelId: channelId || undefined,
           skipWeekendHoliday,
         }),
@@ -79,24 +81,44 @@ const BacklogNotifyPage = () => {
             {/* フォーム */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="group">
-                <label
-                  htmlFor="daysThreshold"
-                  className="block text-sm font-semibold text-gray-700 mb-2"
-                >
-                  📅 遅延日数の閾値
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  📅 通知対象の期間（期限からの日数）
                 </label>
-                <input
-                  type="number"
-                  id="daysThreshold"
-                  value={daysThreshold}
-                  onChange={(e) => setDaysThreshold(Number(e.target.value))}
-                  min="-365"
-                  max="0"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500 text-gray-900"
-                  required
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  納期から何日以上遅延している課題を通知するか（デフォルト: -1 = 1日以上遅延）
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label htmlFor="daysThresholdMin" className="block text-xs text-gray-500 mb-1">
+                      下限（遅延日数）
+                    </label>
+                    <input
+                      type="number"
+                      id="daysThresholdMin"
+                      value={daysThresholdMin}
+                      onChange={(e) => setDaysThresholdMin(Number(e.target.value))}
+                      min="-365"
+                      max="0"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500 text-gray-900"
+                      required
+                    />
+                  </div>
+                  <span className="text-gray-400 mt-6">&lt;</span>
+                  <div className="flex-1">
+                    <label htmlFor="daysThresholdMax" className="block text-xs text-gray-500 mb-1">
+                      上限（期限前日数）
+                    </label>
+                    <input
+                      type="number"
+                      id="daysThresholdMax"
+                      value={daysThresholdMax}
+                      onChange={(e) => setDaysThresholdMax(Number(e.target.value))}
+                      min="-30"
+                      max="30"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-orange-100 focus:border-orange-500 text-gray-900"
+                      required
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  下限 &lt; 期限までの日数 ≦ 上限 の課題を通知（デフォルト: -3 &lt; x ≦ 0 = 期限当日から3日遅延まで）
                 </p>
               </div>
 

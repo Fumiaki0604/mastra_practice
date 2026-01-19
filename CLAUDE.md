@@ -367,23 +367,27 @@ function getDaysUntilDue(dueDate: string): number {
 - **Negative value**: Overdue (e.g., -5 = 5 days late)
 - **Default threshold -1**: Notifies issues that are 1+ days overdue
 
-### Weekday-Only Delivery
+### Weekday-Only Delivery (JST-based)
 
-The API route ([app/api/backlog-notify/route.ts:3-40](app/api/backlog-notify/route.ts)) includes Japanese holiday detection:
+The API route ([app/api/backlog-notify/route.ts](app/api/backlog-notify/route.ts)) includes Japanese holiday detection with **JST timezone handling**.
+
+**Important:** Since Vercel/GitHub Actions run in UTC, all date/time calculations use `getJSTDate()` to convert UTC to JST (+9 hours) before checking weekdays/holidays.
+
+```typescript
+// JST変換（サーバーがUTCで動作するため必須）
+function getJSTDate(): Date {
+  const now = new Date();
+  const jstOffset = 9 * 60 * 60 * 1000;
+  return new Date(now.getTime() + jstOffset);
+}
+```
 
 **Fixed holidays checked:**
-- January 1 (元日)
-- February 11 (建国記念の日)
-- February 23 (天皇誕生日)
-- April 29 (昭和の日)
-- May 3, 4, 5 (GW: 憲法記念日, みどりの日, こどもの日)
-- August 11 (山の日)
-- November 3, 23 (文化の日, 勤労感謝の日)
+- January 1 (元日), February 11 (建国記念の日), February 23 (天皇誕生日)
+- April 29 (昭和の日), May 3-5 (GW), August 11 (山の日)
+- November 3 (文化の日), November 23 (勤労感謝の日)
 
-When `skipWeekendHoliday: true` (default), notifications are skipped on:
-- Saturdays (dayOfWeek === 6)
-- Sundays (dayOfWeek === 0)
-- Japanese national holidays (listed above)
+When `skipWeekendHoliday: true` (default), notifications are skipped on weekends and Japanese holidays.
 
 ### Workflow Steps
 

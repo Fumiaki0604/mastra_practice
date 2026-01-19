@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   try {
     // リクエストボディを取得
     const body = await request.json();
-    const { daysThreshold, channelId, skipWeekendHoliday = true } = body;
+    const { daysThresholdMin, daysThresholdMax, channelId, skipWeekendHoliday = true } = body;
 
     // 平日のみ配信する設定の場合、土日祝日はスキップ（日本時間ベース）
     if (skipWeekendHoliday) {
@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
     const run = await workflow.createRunAsync();
     const result = await run.start({
       inputData: {
-        daysThreshold: daysThreshold ?? -1,
+        daysThresholdMin: daysThresholdMin ?? -3,
+        daysThresholdMax: daysThresholdMax ?? 0,
         channelId: channelId,
       },
     });
