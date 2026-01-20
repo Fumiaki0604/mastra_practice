@@ -65,8 +65,8 @@ export const backlogSearchUrgentIssuesTool = createTool({
   id: "backlog-search-urgent-issues",
   description: "Backlogで納期の迫っている課題をプロジェクト横断で検索します",
   inputSchema: z.object({
-    daysThresholdMin: z.number().optional().default(-3).describe("期限までの日数の下限（デフォルト-3: 3日遅延まで）"),
-    daysThresholdMax: z.number().optional().default(0).describe("期限までの日数の上限（デフォルト0: 期限当日まで）"),
+    daysThresholdMin: z.number().optional().default(-4).describe("期限までの日数の下限（デフォルト-4: 3日遅延を含む）"),
+    daysThresholdMax: z.number().optional().default(1).describe("期限までの日数の上限（デフォルト1: 期限1日前を含む）"),
     statusIds: z.array(z.number()).optional().describe("検索対象のステータスID（省略時は未完了のみ）"),
   }),
   outputSchema: z.object({

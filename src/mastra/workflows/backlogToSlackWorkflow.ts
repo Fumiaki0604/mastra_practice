@@ -11,13 +11,13 @@ export const backlogToSlackWorkflow = createWorkflow({
     daysThresholdMin: z
       .number()
       .optional()
-      .default(-3)
-      .describe("期限までの日数の下限（デフォルト-3: 3日遅延まで）"),
+      .default(-4)
+      .describe("期限までの日数の下限（デフォルト-4: 3日遅延を含む）"),
     daysThresholdMax: z
       .number()
       .optional()
-      .default(0)
-      .describe("期限までの日数の上限（デフォルト0: 期限当日まで）"),
+      .default(1)
+      .describe("期限までの日数の上限（デフォルト1: 期限1日前を含む）"),
     channelId: z
       .string()
       .optional()
@@ -30,8 +30,8 @@ export const backlogToSlackWorkflow = createWorkflow({
     createStep({
       id: "fetch-backlog-issues",
       inputSchema: z.object({
-        daysThresholdMin: z.number().optional().default(-3),
-        daysThresholdMax: z.number().optional().default(0),
+        daysThresholdMin: z.number().optional().default(-4),
+        daysThresholdMax: z.number().optional().default(1),
         channelId: z.string().optional(),
       }),
       outputSchema: backlogSearchUrgentIssuesTool.outputSchema,

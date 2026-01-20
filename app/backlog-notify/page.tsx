@@ -13,8 +13,8 @@ interface NotifyResult {
 }
 
 const BacklogNotifyPage = () => {
-  const [daysThresholdMin, setDaysThresholdMin] = useState<number>(-3);
-  const [daysThresholdMax, setDaysThresholdMax] = useState<number>(0);
+  const [daysThresholdMin, setDaysThresholdMin] = useState<number>(-4);
+  const [daysThresholdMax, setDaysThresholdMax] = useState<number>(1);
   const [channelId, setChannelId] = useState<string>("");
   const [skipWeekendHoliday, setSkipWeekendHoliday] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -118,7 +118,7 @@ const BacklogNotifyPage = () => {
                   </div>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  下限 &lt; 期限までの日数 ≦ 上限 の課題を通知（デフォルト: -3 &lt; x ≦ 0 = 期限当日から3日遅延まで）
+                  下限 &lt; 期限までの日数 ≦ 上限 の課題を通知（デフォルト: -4 &lt; x ≦ 1 = 期限1日前から3日遅延まで）
                 </p>
               </div>
 

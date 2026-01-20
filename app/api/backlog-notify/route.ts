@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
     const run = await workflow.createRunAsync();
     const result = await run.start({
       inputData: {
-        daysThresholdMin: daysThresholdMin ?? -3,
-        daysThresholdMax: daysThresholdMax ?? 0,
+        daysThresholdMin: daysThresholdMin ?? -4,
+        daysThresholdMax: daysThresholdMax ?? 1,
         channelId: channelId,
       },
     });

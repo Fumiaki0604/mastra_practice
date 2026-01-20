@@ -16,7 +16,7 @@ jobs:
           curl -X POST https://mastra-practice.vercel.app/api/backlog-notify \
             -H "Content-Type: application/json" \
             -d '{
-              "daysThresholdMin": -3,
-              "daysThresholdMax": 0,
+              "daysThresholdMin": -4,
+              "daysThresholdMax": 1,
               "skipWeekendHoliday": true
             }'
