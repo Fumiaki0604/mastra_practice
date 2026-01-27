@@ -1,5 +1,6 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { getSlackUserMapping, resolveSlackMention } from "@/lib/googleSheets";
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || "";
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || "";
@@ -79,6 +80,9 @@ export const slackNotifyUrgentIssuesTool = createTool({
         };
       }
 
+      // Slackユーザーマッピングを取得
+      const userMapping = await getSlackUserMapping();
+
       // メッセージ本文を構築（シンプルなリスト形式）
       let messageText = `⚠️ *納期の迫ったBacklog課題（${context.issues.length}件）*\n\n`;
 
@@ -95,7 +99,14 @@ export const slackNotifyUrgentIssuesTool = createTool({
         }
 
         messageText += `\n`;
-        messageText += `   👤 担当: ${issue.assignee || "未割り当て"} | `;
+
+        // 担当者のSlackメンションを解決
+        const mention = issue.assignee ? resolveSlackMention(issue.assignee, userMapping) : "";
+        const assigneeDisplay = mention
+          ? `${mention} (${issue.assignee})`
+          : (issue.assignee || "未割り当て");
+
+        messageText += `   👤 担当: ${assigneeDisplay} | `;
         messageText += `📂 ${issue.projectName} | `;
         messageText += `🏷️ ${issue.status}\n\n`;
       });
