@@ -51,12 +51,21 @@ async function callBacklogAPI(spaceId: string, apiKey: string, endpoint: string)
   return response.json();
 }
 
-// 日付の差分を計算（日数）
+// JSTの日付を取得（年月日のみ）
+function getJSTDateOnly(date: Date): Date {
+  const jstOffset = 9 * 60 * 60 * 1000;
+  const jstTime = new Date(date.getTime() + jstOffset);
+  return new Date(Date.UTC(jstTime.getUTCFullYear(), jstTime.getUTCMonth(), jstTime.getUTCDate()));
+}
+
+// 日付の差分を計算（日数）- JSTベース
 function getDaysUntilDue(dueDate: string): number {
-  const due = new Date(dueDate);
-  const now = new Date();
+  // 期限日（時刻部分を除去してJSTの0時として扱う）
+  const dueDateOnly = new Date(dueDate.split("T")[0] + "T00:00:00+09:00");
+  const due = getJSTDateOnly(dueDateOnly);
+  const now = getJSTDateOnly(new Date());
   const diffTime = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
 }
 
