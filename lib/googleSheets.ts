@@ -66,16 +66,23 @@ async function getAccessToken(): Promise<string> {
 export async function getSlackUserMapping(): Promise<SlackUserMapping> {
   // キャッシュチェック
   if (cachedMapping && Date.now() - cacheTimestamp < CACHE_TTL) {
+    console.log("[GoogleSheets] Using cached mapping:", Object.keys(cachedMapping).length, "entries");
     return cachedMapping;
   }
 
   if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !GOOGLE_SPREADSHEET_ID) {
-    console.warn("Google Sheets credentials not configured");
+    console.warn("[GoogleSheets] Credentials not configured:", {
+      email: !!GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: !!GOOGLE_PRIVATE_KEY,
+      spreadsheet: !!GOOGLE_SPREADSHEET_ID,
+    });
     return {};
   }
 
   try {
+    console.log("[GoogleSheets] Fetching user mapping...");
     const accessToken = await getAccessToken();
+    console.log("[GoogleSheets] Access token obtained");
 
     // シート名を取得してからデータ取得
     const metaRes = await fetch(
@@ -99,6 +106,11 @@ export async function getSlackUserMapping(): Promise<SlackUserMapping> {
     const mapping: SlackUserMapping = {};
     const rows = data.values || [];
 
+    console.log("[GoogleSheets] Sheet:", sheetName, "Rows:", rows.length);
+    if (rows.length > 0) {
+      console.log("[GoogleSheets] Header:", rows[0]);
+    }
+
     // ヘッダー行をスキップ
     for (let i = 1; i < rows.length; i++) {
       const [name, , slackId] = rows[i];
@@ -113,11 +125,12 @@ export async function getSlackUserMapping(): Promise<SlackUserMapping> {
       }
     }
 
+    console.log("[GoogleSheets] Mapping created:", JSON.stringify(mapping));
     cachedMapping = mapping;
     cacheTimestamp = Date.now();
     return mapping;
   } catch (error) {
-    console.error("Failed to fetch Slack user mapping:", error);
+    console.error("[GoogleSheets] Error:", error);
     return cachedMapping || {};
   }
 }
@@ -125,8 +138,11 @@ export async function getSlackUserMapping(): Promise<SlackUserMapping> {
 export function resolveSlackMention(assigneeName: string, mapping: SlackUserMapping): string {
   if (!assigneeName) return "";
 
+  console.log("[GoogleSheets] Resolving mention for:", assigneeName, "Mapping keys:", Object.keys(mapping));
+
   // 完全一致
   if (mapping[assigneeName]) {
+    console.log("[GoogleSheets] Exact match found");
     return `<@${mapping[assigneeName]}>`;
   }
 
