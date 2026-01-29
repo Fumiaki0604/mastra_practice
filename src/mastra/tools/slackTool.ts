@@ -83,8 +83,26 @@ export const slackNotifyUrgentIssuesTool = createTool({
       // Slackユーザーマッピングを取得
       const userMapping = await getSlackUserMapping();
 
-      // メッセージ本文を構築（シンプルなリスト形式）
-      let messageText = `⚠️ *納期の迫ったBacklog課題（${context.issues.length}件）*\n\n`;
+      // 担当者ごとのメンションを収集（重複排除）
+      const mentionSet = new Set<string>();
+      const issueMentions: string[] = [];
+
+      context.issues.forEach((issue) => {
+        const mention = issue.assignee ? resolveSlackMention(issue.assignee, userMapping) : "";
+        issueMentions.push(mention);
+        if (mention) {
+          mentionSet.add(mention);
+        }
+      });
+
+      // メッセージ本文を構築
+      let messageText = `⚠️ *納期の迫ったBacklog課題（${context.issues.length}件）*\n`;
+
+      // 先頭にメンション一覧を追加
+      if (mentionSet.size > 0) {
+        messageText += Array.from(mentionSet).join(" ") + "\n";
+      }
+      messageText += "\n";
 
       context.issues.forEach((issue, index) => {
         const dueInfo = issue.daysUntilDue !== undefined
@@ -100,11 +118,9 @@ export const slackNotifyUrgentIssuesTool = createTool({
 
         messageText += `\n`;
 
-        // 担当者のSlackメンションを解決
-        const mention = issue.assignee ? resolveSlackMention(issue.assignee, userMapping) : "";
-        const assigneeDisplay = mention
-          ? `${mention} (${issue.assignee})`
-          : (issue.assignee || "未割り当て");
+        // 担当者表示（メンションがあればメンション、なければ元の名前）
+        const mention = issueMentions[index];
+        const assigneeDisplay = mention || (issue.assignee || "未割り当て");
 
         messageText += `   👤 担当: ${assigneeDisplay} | `;
         messageText += `📂 ${issue.projectName} | `;
