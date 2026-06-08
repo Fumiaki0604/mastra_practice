@@ -56,6 +56,12 @@ BACKLOG_API_KEY=xxxxx
 SLACK_BOT_TOKEN=xoxb-xxxxx
 SLACK_CHANNEL_ID=C01234567ABC
 
+# Google Sheets (担当者→SlackユーザーIDマッピング用)
+GOOGLE_SERVICE_ACCOUNT_EMAIL=xxxx@project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+GOOGLE_SPREADSHEET_ID=1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_SHEET_GID=0
+
 # AWS Bedrock
 BEDROCK_REGION=us-west-2
 ```
@@ -315,7 +321,24 @@ on:
 }
 ```
 
+> **注意: GitHub Actions 60日非アクティブ自動停止**
+> リポジトリへのコミット・PR等がない状態が60日続くと、GitHubがスケジュールワークフローを自動無効化する。
+> 通知が止まった場合は GitHub → Actions タブ → `Backlog課題 定期通知` を確認し、`Enable workflow` で再有効化すること。
+> または空コミット等でリポジトリをアクティブに保つ。
+
 ## Backlog通知システム詳細
+
+### Slack担当者メンション
+
+Google Sheetsにバックログの担当者名とSlackユーザーIDのマッピングを記載することで、通知時に担当者をメンションできる。
+
+**スプレッドシート形式（A:C列）：**
+
+| A列（氏名） | B列（フリガナ） | C列（Slack User ID） |
+|-------------|----------------|----------------------|
+| 佐藤 翔吾   | サトウ ショウゴ | U01234ABCDE          |
+
+実装: [lib/googleSheets.ts](lib/googleSheets.ts)
 
 ### マルチワークスペース対応
 
