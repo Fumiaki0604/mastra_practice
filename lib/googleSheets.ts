@@ -111,17 +111,26 @@ export async function getSlackUserMapping(): Promise<SlackUserMapping> {
       console.log("[GoogleSheets] Header:", rows[0]);
     }
 
+    // 姓ごとの該当者（同姓が複数いる場合は姓のみのマッピングを作らない）
+    const lastNameIds: Record<string, Set<string>> = {};
+
     // ヘッダー行をスキップ
     for (let i = 1; i < rows.length; i++) {
       const [name, , slackId] = rows[i];
       if (name && slackId) {
-        // フルネームでマッピング
-        mapping[name] = slackId;
-        // 姓のみでもマッピング（「佐藤 翔吾」→「佐藤」）
-        const lastName = name.split(/\s+/)[0];
-        if (lastName && !mapping[lastName]) {
-          mapping[lastName] = slackId;
+        // フルネーム（空白除去）でマッピング
+        mapping[normalizeName(name)] = slackId;
+        const lastName = name.trim().split(/\s+/)[0];
+        if (lastName) {
+          (lastNameIds[lastName] ??= new Set()).add(slackId);
         }
+      }
+    }
+
+    // 姓のみでもマッピング（「佐藤 翔吾」→「佐藤」）。社内で一意な姓のみ
+    for (const [lastName, ids] of Object.entries(lastNameIds)) {
+      if (ids.size === 1 && !mapping[lastName]) {
+        mapping[lastName] = [...ids][0];
       }
     }
 
@@ -140,30 +149,34 @@ export function resolveSlackMention(assigneeName: string, mapping: SlackUserMapp
 
   console.log("[GoogleSheets] Resolving mention for:", assigneeName, "Mapping keys:", Object.keys(mapping));
 
-  // 完全一致
-  if (mapping[assigneeName]) {
+  // 完全一致（括弧・空白を除去して比較。例: 「藤原（AtoJ）」→「藤原」）
+  const normalized = normalizeName(assigneeName);
+  if (!normalized) return "";
+  if (mapping[normalized]) {
     console.log("[GoogleSheets] Exact match found");
-    return `<@${mapping[assigneeName]}>`;
+    return `<@${mapping[normalized]}>`;
   }
 
-  // 括弧を除去して検索（例: 「藤原（AtoJ）」→「藤原」）
-  const nameWithoutParens = assigneeName.replace(/[（(].+[）)]/g, "").trim();
-  if (mapping[nameWithoutParens]) {
-    return `<@${mapping[nameWithoutParens]}>`;
-  }
-
-  // 姓のみで検索
-  const lastName = nameWithoutParens.split(/\s+/)[0];
+  // 姓のみで検索（一意な姓のみマッピングされている）
+  const lastName = assigneeName.replace(/[（(].+?[）)]/g, "").trim().split(/\s+/)[0];
   if (mapping[lastName]) {
     return `<@${mapping[lastName]}>`;
   }
 
-  // 部分一致検索
-  for (const [key, slackId] of Object.entries(mapping)) {
-    if (assigneeName.includes(key) || key.includes(nameWithoutParens)) {
-      return `<@${slackId}>`;
-    }
+  // 部分一致検索（該当者が1人に絞れる場合のみ）
+  const candidates = new Set(
+    Object.entries(mapping)
+      .filter(([key]) => normalized.includes(key) || key.includes(normalized))
+      .map(([, slackId]) => slackId)
+  );
+  if (candidates.size === 1) {
+    return `<@${[...candidates][0]}>`;
   }
 
   return "";
+}
+
+// 比較用に括弧書きと空白（全角含む）を除去
+function normalizeName(name: string): string {
+  return name.replace(/[（(].+?[）)]/g, "").replace(/\s+/g, "");
 }
