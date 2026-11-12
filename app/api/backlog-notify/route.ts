@@ -47,11 +47,33 @@ function isWeekday(date: Date): boolean {
   return true;
 }
 
+type NotifyParams = {
+  daysThresholdMin?: number;
+  daysThresholdMax?: number;
+  channelId?: string;
+  skipWeekendHoliday?: boolean;
+};
+
+// Vercel Cronからの定期実行（GETで呼ばれる）
+// CRON_SECRETが設定されている場合、Vercelが付与するAuthorizationヘッダーを検証する
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return runNotify({ daysThresholdMin: -4, daysThresholdMax: 1, skipWeekendHoliday: true });
+}
+
 export async function POST(request: NextRequest) {
+  // リクエストボディを取得
+  const body = await request.json().catch(() => ({}));
+  return runNotify(body);
+}
+
+async function runNotify(params: NotifyParams) {
   try {
-    // リクエストボディを取得
-    const body = await request.json();
-    const { daysThresholdMin, daysThresholdMax, channelId, skipWeekendHoliday = true } = body;
+    const { daysThresholdMin, daysThresholdMax, channelId, skipWeekendHoliday = true } = params;
 
     // 平日のみ配信する設定の場合、土日祝日はスキップ（日本時間ベース）
     if (skipWeekendHoliday) {
