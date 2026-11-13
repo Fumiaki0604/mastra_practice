@@ -163,6 +163,19 @@ export function resolveSlackMention(assigneeName: string, mapping: SlackUserMapp
     return `<@${mapping[lastName]}>`;
   }
 
+  // 括弧内を名の手がかりとして検索（例: 「佐藤（史）」→ 佐藤姓で名が「史」で始まる人）
+  const hint = assigneeName.match(/[（(](.+?)[）)]/)?.[1]?.replace(/\s+/g, "");
+  if (hint) {
+    const hinted = new Set(
+      Object.entries(mapping)
+        .filter(([key]) => key.startsWith(normalized + hint))
+        .map(([, slackId]) => slackId)
+    );
+    if (hinted.size === 1) {
+      return `<@${[...hinted][0]}>`;
+    }
+  }
+
   // 部分一致検索（該当者が1人に絞れる場合のみ）
   const candidates = new Set(
     Object.entries(mapping)
